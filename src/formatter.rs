@@ -31,18 +31,9 @@ pub struct ImageFormatter<T> {
     window_controls_height: u32,
     /// Window title
     window_title: Option<String>,
-    /// show line number
-    /// Default: true
-    line_number: bool,
     /// round corner
     /// Default: true
     round_corner: bool,
-    /// pad between code and line number
-    /// Default: 6
-    line_number_pad: u32,
-    /// number of columns of line number area
-    /// Default: Auto detect
-    line_number_chars: u32,
     /// font of english character, should be mono space font
     /// Default: Hack (builtin)
     font: T,
@@ -52,8 +43,6 @@ pub struct ImageFormatter<T> {
     shadow_adder: Option<ShadowAdder>,
     /// Tab width
     tab_width: u8,
-    /// Line Offset
-    line_offset: u32,
 }
 
 #[derive(Default)]
@@ -62,8 +51,6 @@ pub struct ImageFormatterBuilder<S> {
     line_pad: u32,
     /// Padding to the right of the code
     code_pad_right: u32,
-    /// Show line number
-    line_number: bool,
     /// Font of english character, should be mono space font
     font: Vec<(S, f32)>,
     /// Highlight lines
@@ -78,8 +65,6 @@ pub struct ImageFormatterBuilder<S> {
     shadow_adder: Option<ShadowAdder>,
     /// Tab width
     tab_width: u8,
-    /// Line Offset
-    line_offset: u32,
 }
 
 // FIXME: cannot use `ImageFormatterBuilder::new().build()` bacuse cannot infer type for `S`
@@ -87,25 +72,12 @@ impl<S: AsRef<str> + Default> ImageFormatterBuilder<S> {
     pub fn new() -> Self {
         Self {
             line_pad: 2,
-            line_number: true,
             window_controls: true,
             window_title: None,
             round_corner: true,
             tab_width: 4,
             ..Default::default()
         }
-    }
-
-    /// Whether show the line number
-    pub fn line_number(mut self, show: bool) -> Self {
-        self.line_number = show;
-        self
-    }
-
-    /// Set Line offset
-    pub fn line_offset(mut self, offset: u32) -> Self {
-        self.line_offset = offset;
-        self
     }
 
     /// Set the pad between lines
@@ -181,15 +153,11 @@ impl<S: AsRef<str> + Default> ImageFormatterBuilder<S> {
             window_controls_width: 120,
             window_controls_height: 40,
             window_title: self.window_title,
-            line_number: self.line_number,
-            line_number_pad: 6,
-            line_number_chars: 0,
             highlight_lines: self.highlight_lines,
             round_corner: self.round_corner,
             shadow_adder: self.shadow_adder,
             tab_width: self.tab_width,
             font,
-            line_offset: self.line_offset,
         })
     }
 }
@@ -225,12 +193,6 @@ impl<T: TextLineDrawer> ImageFormatter<T> {
     /// Calculate where code start
     fn get_left_pad(&mut self) -> u32 {
         self.code_pad
-            + if self.line_number {
-                let tmp = format!("{:>width$}", 0, width = self.line_number_chars as usize);
-                2 * self.line_number_pad + self.font.width(&tmp)
-            } else {
-                0
-            }
     }
 
     /// create
@@ -295,28 +257,6 @@ impl<T: TextLineDrawer> ImageFormatter<T> {
         }
     }
 
-    fn draw_line_number(&mut self, image: &mut RgbaImage, lineno: u32, mut color: Rgba<u8>) {
-        for i in color.0.iter_mut() {
-            *i = (*i).saturating_sub(20);
-        }
-        for i in 0..=lineno {
-            let line_number = format!(
-                "{:>width$}",
-                i + self.line_offset,
-                width = self.line_number_chars as usize
-            );
-            let y = self.get_line_y(i);
-            self.font.draw_text(
-                image,
-                color,
-                self.code_pad,
-                y,
-                FontStyle::REGULAR,
-                &line_number,
-            );
-        }
-    }
-
     fn highlight_lines<I: IntoIterator<Item = u32>>(&mut self, image: &mut RgbaImage, lines: I) {
         let width = image.width();
         let height = self.get_line_height();
@@ -336,14 +276,6 @@ impl<T: TextLineDrawer> ImageFormatter<T> {
 
     // TODO: use &T instead of &mut T ?
     pub fn format(&mut self, v: &[Vec<(Style, &str)>], theme: &Theme) -> RgbaImage {
-        if self.line_number {
-            self.line_number_chars =
-                (((v.len() + self.line_offset as usize) as f32).log10() + 1.0).floor() as u32;
-        } else {
-            self.line_number_chars = 0;
-            self.line_number_pad = 0;
-        }
-
         let drawables = self.create_drawables(v);
 
         let size = self.get_image_size(drawables.max_width, drawables.max_lineno);
@@ -361,9 +293,6 @@ impl<T: TextLineDrawer> ImageFormatter<T> {
                 .filter(|&n| n >= 1 && n <= drawables.max_lineno + 1)
                 .collect::<Vec<_>>();
             self.highlight_lines(&mut image, highlight_lines);
-        }
-        if self.line_number {
-            self.draw_line_number(&mut image, drawables.max_lineno, foreground.to_rgba());
         }
 
         for (x, y, color, style, text) in drawables.drawables {

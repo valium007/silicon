@@ -130,10 +130,6 @@ pub struct Config {
     #[structopt(long, value_name = "PAD", default_value = "25")]
     pub code_pad_right: u32,
 
-    /// Line number offset
-    #[structopt(long, value_name = "OFFSET", default_value = "1")]
-    pub line_offset: u32,
-
     /// List all themes.
     #[structopt(long)]
     pub list_themes: bool,
@@ -158,10 +154,6 @@ pub struct Config {
     /// Show window title
     #[structopt(long, value_name = "WINDOW_TITLE")]
     pub window_title: Option<String>,
-
-    /// Hide the line number.
-    #[structopt(long)]
-    pub no_line_number: bool,
 
     /// Don't round the corner
     #[structopt(long)]
@@ -279,13 +271,11 @@ impl Config {
             .line_pad(self.line_pad)
             .window_controls(!self.no_window_controls)
             .window_title(self.window_title.clone())
-            .line_number(!self.no_line_number)
             .font(self.font.clone().unwrap_or_default())
             .round_corner(!self.no_round_corner)
             .shadow_adder(self.get_shadow_adder()?)
             .tab_width(self.tab_width)
             .highlight_lines(self.highlight_lines.clone().unwrap_or_default())
-            .line_offset(self.line_offset)
             .code_pad_right(self.code_pad_right);
 
         Ok(formatter.build()?)
